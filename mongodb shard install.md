@@ -368,3 +368,59 @@
      sh.addShard( "shard2/node121:27020,node122:27020,node123:27020")
      sh.addShard( "shard3/node121:27021,node122:27021,node123:27021")
      ```
+### 启用认证
+   对副本集执行访问控制需要配置两个方面:
+   - 副本集和共享集群的各个节点成员之间使用内部身份验证，可以使用密钥文件或x.509证书。密钥文件比较简单，本文介绍的也是使用密钥文件，官方推荐如果是测试环境可以使用密钥文件，但是正是环境，官方推荐x.509证书。原理就是，集群中每一个实例彼此连接的时候都检验彼此使用的证书的内容是否相同。只有证书相同的实例彼此才可以访问
+   - 使用客户端连接到mongodb集群时，开启访问授权。对于集群外部的访问。如通过可视化客户端，或者通过代码连接的时候，需要开启授权。
+
+下面开始详细说明：
+
+   1. 生成密钥文件
+      在keyfile身份验证中，副本集中的每个mongod实例都使用keyfile的内容作为共享密码，只有具有正确密钥文件的mongod或者mongos实例可以连接到副本集。密钥文件的内容必须在6到1024个字符之间，并且在unix/linux系统中文件所有者必须有对文件至少有读的权限。 可以用任何方式生成密钥文件例如：
+   ```bash
+      openssl rand -base64 756 > /data/mongodb/testKeyFile.file
+      chmod 400 /data/mongodb/keyfile/testKeyFile.file
+      chmod -R mongod:mongod /data/mongodb/keyfile/
+   ```
+      第一条命令是生成密钥文件，第二条命令是使用chmod更改文件权限，为文件所有者提供读权限
+   2. 将密钥复制到集群中的每台机器（82，83，86）的指定位置
+   ```bash scp -P22 /data/mongodb/testKeyFile.file root@10.12.40.86:/data/mongodb ```
+    > 一定要保证密钥文件一致。文件位置随便。但是为了方便查找，建议每台机器都放到一个固定的位置。我的配置文件都放在`/data/mongodb/testKeyFile.file`
+   3. 预先创建好一个管理员账号和密码然后将集群中的所有mongod和mongos全部关闭账号可以在集群认开启认证以后添加。但是那时候添加比较谨慎。只能添加一次，如果忘记了就无法再连接到集群。建议在没开启集群认证的时候先添加好管理员用户名和密码然后再开启认证再重启
+   - 连接任意一台机器的mongos
+      ```bash mongo --port 23000```
+   - 添加用户
+      ```shell
+      use admin   //注意一定要使用admin数据库 
+      db.createUser({user:"your account",pwd:"your password",roles:[{role:"root",db:"admin"}]})
+      ```
+   - 然后依次连接到每一台机器上执行。
+      ```bash
+      killall mongod 
+      killall mongos
+      ```
+   > 然后删除每个mongod实例存储数据存储路径下面的mongod.lock（如果后面启动不报错可以不处理）可以发现。集群多少有的节点都关闭了。没开启认证的集群如果开启认证需要集群宕机几分钟。当然也有热启动的方式，官方文档中有介绍说明：可以先开启认证重启后再添加用户。但是只能在admin库添加一次，所以如果忘记了，或者权限分配不恰当就无法再更改，所以建议先添加用户再开启认证重启，并且集群不建议在每个单节点添加用户，并且建议单节点关闭初始添加账号的权限，详情见enableLocalhostAuthBypass)
+
+   3. 使用访问控制强制重新启动复制集的每个成员这个步骤比较重要。设置访问控制有两种方式。我选择在配置文件里面配置好。（也可以在启动命令时使用命令来指定）
+
+   4. 依次在每台机器上的mongod（注意是所有的mongod不是mongos）的配置文件中加入下面一段配置。如我在10.12.40.83上的config server，shard1，shard2，shard3都加入下面的配置文件
+   ```yaml
+   security:   
+     keyFile: /data/mongodb/testKeyFile.file   
+     authorization: enabled
+   ```
+   依次在每台机器上的mongos配置文件中加入下面一段配置。如我在10.12.40.83上的mongos配置文件中加入上面的一段配置
+   ```yaml
+   security:   keyFile: /data/mongodb/testKeyFile.file
+   ```
+   > 解释：mongos比mongod少了authorization：enabled的配置。原因是，副本集加分片的安全认证需要配置两方面的，副本集各个节点之间使用内部身份验证，用于内部各个mongo实例的通信，只有相同keyfile才能相互访问。所以都要开启keyFile: `/data/mongodb/testKeyFile.file`.然而对于所有的mongod，才是真正的保存数据的分片。mongos只做路由，不保存数据。所以所有的mongod开启访问数据的授权authorization:enabled。这样用户只有账号密码正确才能访问到数据
+
+   5. 重启每个mongo示例。因为我的认证配置在了配置文件里面，所以启动命令不需要再加认证的参数 (例如--auth等)
+   ```bash
+   mongod -f /data/mongodb/config/configs.config 
+   mongod -f /data/mongodb/config/shard1.config 
+   mongod -f /data/mongodb/config/shard2.config 
+   mongod -f /data/mongodb/config/shard3.config 
+   mongos -f /data/mongodb/config/mongos.config
+   ```
+   依次重启三台机器的mongod和mongos实例
