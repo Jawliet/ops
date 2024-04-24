@@ -67,7 +67,7 @@
 
    after you enter MySQL password, the output should be similar to
 
-   ![Identify MySQL Data Directory](C:\iov\文档\技术\Identify-MySQL-Data-Directory.png)
+   ![Identify MySQL Data Directory](https://github.com/Jawliet/ops/blob/main/img/Identify-MySQL-Data-Directory.png)
 
 3. copy MySQL data directory to a new location
 
@@ -92,7 +92,7 @@
    socket=/mnt/mysql-data/mysql.sock
    ```
 
-   ![Configure New MySQL Data Directory](C:\iov\文档\技术\Configure-New-MySQL-Data-Directory.png)
+   ![Configure New MySQL Data Directory](https://github.com/Jawliet/ops/blob/main/img/Configure-New-MySQL-Data-Directory.png)
 
 5. set SELinux security context to data directory
 
@@ -118,4 +118,4 @@
    mysql -u root -p -e "SELECT @@datadir;"
    ```
 
-   ![Verify MySQL New Data Directory](C:\iov\文档\技术\Verify-MySQL-New-Data-Directory.png)
+   ![Verify MySQL New Data Directory](https://github.com/Jawliet/ops/blob/main/img/Verify-MySQL-New-Data-Directory.png)
