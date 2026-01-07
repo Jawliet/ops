@@ -133,10 +133,6 @@ export PATH=$PATH:$HOME/minio-binaries/
 
 ### 添加远端 alias（一次性配置）
 
-bash
-
-复制
-
 ```bash
 # 语法
 mc alias set <别名> <HOST:PORT> <ACCESS_KEY> <SECRET_KEY> [--api s3v4]
@@ -202,3 +198,4 @@ mc anonymous set-json readonly-nolist.json minio/monitor
   - `arn:aws:s3:::monitor` 代表“桶本身（列表接口）”
 
 - 这条策略只影响匿名请求；带 ak/sk 或预签名的调用完全不受限。
+
